@@ -64,6 +64,10 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
+func (s *Store) DB() *sql.DB {
+	return s.db
+}
+
 func (s *Store) InsertSystemMetrics(m models.SystemMetrics) error {
 	_, err := s.db.Exec(
 		"INSERT INTO system_metrics (timestamp, cpu_percent, memory_used_bytes, memory_total_bytes, disk_read_bps, disk_write_bps) VALUES (?, ?, ?, ?, ?, ?)",

@@ -155,7 +155,7 @@ func TestPrimaryPID(t *testing.T) {
 
 func TestRootCmdHasSubcommands(t *testing.T) {
 	root := NewRootCmd()
-	for _, name := range []string{"top", "inspect", "daemon", "history"} {
+	for _, name := range []string{"top", "inspect", "daemon", "history", "report"} {
 		found := false
 		for _, c := range root.Commands() {
 			if c.Name() == name {

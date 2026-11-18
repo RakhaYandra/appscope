@@ -48,6 +48,9 @@ func TestSystemMetricsSeriesBuckets(t *testing.T) {
 	if rows[0].AvgMemoryUsed != 2000 {
 		t.Errorf("bucket0 avg mem = %d, want 2000", rows[0].AvgMemoryUsed)
 	}
+	if rows[0].MaxMemoryUsed != 3000 {
+		t.Errorf("bucket0 max mem = %d, want 3000", rows[0].MaxMemoryUsed)
+	}
 	if rows[1].AvgCPU != 50 || rows[1].MaxCPU != 50 {
 		t.Errorf("bucket1 cpu = %f/%f, want 50/50", rows[1].AvgCPU, rows[1].MaxCPU)
 	}

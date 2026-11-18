@@ -144,7 +144,7 @@ func runHistory(w io.Writer, dbPath, app string, d time.Duration, metric string)
 		if app != "" {
 			target = app
 		}
-		fmt.Fprintf(w, "No history for %s in the last %s (is appscoped running?)\n", target, durationStr2(d))
+		_, _ = fmt.Fprintf(w, "No history for %s in the last %s (is appscoped running?)\n", target, durationStr2(d))
 		return nil
 	}
 
@@ -188,12 +188,12 @@ func runHistory(w io.Writer, dbPath, app string, d time.Duration, metric string)
 }
 
 func durationStr2(d time.Duration) string {
-	switch {
-	case d == time.Hour:
+	switch d {
+	case time.Hour:
 		return "1h"
-	case d == 24*time.Hour:
+	case 24 * time.Hour:
 		return "24h"
-	case d == 7*24*time.Hour:
+	case 7 * 24 * time.Hour:
 		return "7d"
 	default:
 		return d.String()

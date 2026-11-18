@@ -12,6 +12,7 @@ type SystemSeriesRow struct {
 	AvgCPU          float64
 	MaxCPU          float64
 	AvgMemoryUsed   uint64
+	MaxMemoryUsed   uint64
 	AvgDiskReadBps  uint64
 	AvgDiskWriteBps uint64
 }
@@ -23,7 +24,7 @@ func (s *Store) SystemMetricsSeries(since time.Time, bucketSeconds int) ([]Syste
 	rows, err := s.db.Query(
 		`SELECT CAST(strftime('%s', timestamp) AS INTEGER) / ? AS bucket,
 			AVG(cpu_percent), MAX(cpu_percent),
-			CAST(AVG(memory_used_bytes) AS INTEGER),
+			CAST(AVG(memory_used_bytes) AS INTEGER), CAST(MAX(memory_used_bytes) AS INTEGER),
 			CAST(AVG(disk_read_bps) AS INTEGER), CAST(AVG(disk_write_bps) AS INTEGER)
 		FROM system_metrics
 		WHERE timestamp >= ?
@@ -38,7 +39,7 @@ func (s *Store) SystemMetricsSeries(since time.Time, bucketSeconds int) ([]Syste
 	for rows.Next() {
 		var bucket int64
 		var r SystemSeriesRow
-		if err := rows.Scan(&bucket, &r.AvgCPU, &r.MaxCPU, &r.AvgMemoryUsed, &r.AvgDiskReadBps, &r.AvgDiskWriteBps); err != nil {
+		if err := rows.Scan(&bucket, &r.AvgCPU, &r.MaxCPU, &r.AvgMemoryUsed, &r.MaxMemoryUsed, &r.AvgDiskReadBps, &r.AvgDiskWriteBps); err != nil {
 			return nil, fmt.Errorf("scan system series: %w", err)
 		}
 		r.BucketStart = time.Unix(bucket*int64(bucketSeconds), 0).UTC()

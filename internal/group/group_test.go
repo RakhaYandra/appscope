@@ -19,7 +19,9 @@ func TestScopeAppName(t *testing.T) {
 		{"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-flatpak-org.mozilla.firefox-5678.scope\n", "firefox", true},
 		{"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-kde-org.kde.kate-42.scope\n", "kate", true},
 		{"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.TextEditor-99.scope\n", "TextEditor", true},
-		{"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-Hyprland-gtk\\x2dlaunch-b23018c3.scope\n", "Hyprland-gtk-launch", true},
+		{"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-Hyprland-gtk\\x2dlaunch-b23018c3.scope\n", "", false},
+		{"0::/user.slice/user-1000.slice/app.slice/app-graphical.slice/app-MyEditor-a1b2c3d4.scope\n", "MyEditor", true},
+		{"0::/user.slice/user-1000.slice/app.slice/app-uwsm-firefox-1234.scope\n", "firefox", true},
 		{"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-gnome-my-app-deadbeef.scope\n", "my-app", true},
 		{"0::/user.slice/user-1000.slice/session.slice/wayland-wm@wayland-0.service\n", "", false},
 		{"0::/init.scope\n", "", false},
@@ -129,6 +131,53 @@ func TestGrouperFallsBackToDesktopMatch(t *testing.T) {
 	got := g.Group([]engine.ProcessMetrics{proc(300, 1, "mybrowser")})
 	if len(got) != 1 || got[0].AppName != "MyBrowser" {
 		t.Fatalf("apps = %+v, want MyBrowser via desktop match", got)
+	}
+}
+
+func TestGrouperLauncherScopeFallsBackToDesktop(t *testing.T) {
+	root := t.TempDir()
+	appsDir := t.TempDir()
+	binDir := t.TempDir()
+	bin := filepath.Join(binDir, "firefox")
+	if err := os.WriteFile(bin, []byte("#!/bin/true\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	desktop := "[Desktop Entry]\nName=Firefox\nExec=" + bin + " %u\nType=Application\n"
+	if err := os.WriteFile(filepath.Join(appsDir, "firefox.desktop"), []byte(desktop), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pidDir := filepath.Join(root, "proc", "700")
+	if err := os.MkdirAll(pidDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	launcherScope := "0::/user.slice/user-1000.slice/app-graphical.slice/app-Hyprland-gtk\\x2dlaunch-b23018c3.scope\n"
+	if err := os.WriteFile(filepath.Join(pidDir, "cgroup"), []byte(launcherScope), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(bin, filepath.Join(pidDir, "exe")); err != nil {
+		t.Fatal(err)
+	}
+
+	g := &Grouper{Root: root, DesktopDirs: []string{appsDir}}
+	got := g.Group([]engine.ProcessMetrics{proc(700, 1, "firefox")})
+	if len(got) != 1 || got[0].AppName != "Firefox" {
+		t.Fatalf("apps = %+v, want Firefox via desktop match despite launcher scope", got)
+	}
+}
+
+func TestGrouperTreeRootSystemdLabeledSystem(t *testing.T) {
+	root := t.TempDir()
+	g := &Grouper{Root: root, DesktopDirs: []string{t.TempDir()}}
+	got := g.Group([]engine.ProcessMetrics{
+		proc(1, 0, "systemd"),
+		proc(50, 1, "dbus-broker-lau"),
+		proc(51, 50, "helper"),
+	})
+	if len(got) != 1 {
+		t.Fatalf("apps = %d, want 1: %+v", len(got), got)
+	}
+	if got[0].AppName != "system" {
+		t.Errorf("name = %q, want system", got[0].AppName)
 	}
 }
 

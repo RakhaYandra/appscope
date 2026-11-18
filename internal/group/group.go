@@ -110,11 +110,14 @@ func treeRootComm(p engine.ProcessMetrics, byPID map[int]*engine.ProcessMetrics)
 	seen := map[int]bool{cur.PID: true}
 	for {
 		parent, ok := byPID[cur.PPID]
-		if !ok || cur.PPID <= 1 || seen[parent.PID] {
+		if !ok || seen[parent.PID] {
 			break
 		}
 		seen[parent.PID] = true
 		cur = *parent
+	}
+	if cur.Comm == "systemd" {
+		return "system"
 	}
 	if cur.Comm == "" {
 		return "pid-" + strconv.Itoa(p.PID)

@@ -8,9 +8,23 @@ import (
 var appScopeRe = regexp.MustCompile(`^app-(.+)\.scope$`)
 var instanceIDRe = regexp.MustCompile(`^([0-9]+|[0-9a-f]{6,})$`)
 
+var launcherNames = map[string]bool{
+	"uwsm": true, "dbus-launch": true, "gio-launch-desktop": true, "gtk-launch": true,
+	"gnome-session": true, "plasmashell": true,
+}
+
+func isLauncherName(name string) bool {
+	n := strings.ToLower(name)
+	if launcherNames[n] {
+		return true
+	}
+	return strings.Contains(n, "launch")
+}
+
 var launcherPrefixes = map[string]bool{
 	"gnome": true, "kde": true, "plasma": true, "flatpak": true,
 	"wayland": true, "x11": true, "unity": true, "cinnamon": true, "xfce": true,
+	"uwsm": true,
 }
 
 func scopeAppName(cgroupContent string) (string, bool) {
@@ -25,9 +39,16 @@ func scopeAppName(cgroupContent string) (string, bool) {
 		if m == nil {
 			continue
 		}
-		if name := normalizeScopeInner(m[1]); name != "" {
-			return name, true
+		name := normalizeScopeInner(m[1])
+		if name == "" {
+			continue
 		}
+		if isLauncherName(name) {
+			// scope named after the launcher, not the app (e.g. uwsm/gtk-launch);
+			// let desktop-file or tree resolution identify the real app
+			return "", false
+		}
+		return name, true
 	}
 	return "", false
 }

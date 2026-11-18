@@ -10,13 +10,20 @@ Standard tools (`top`, `btop`) show resources per PID. Modern apps (Firefox, VS 
 Linux procfs/sysfs → Core Engine daemon (Go) → Unix socket IPC (JSON-RPC) → CLI + Omarchy Plugin
 ```
 
-SQLite (WAL) stores historical snapshots with multi-tier rollup (1 Hz raw ≤24 h → per-minute avg/max/min ≤7 d → purge).
+SQLite (WAL) stores historical snapshots; `appscope history` aggregates them into time-bucketed averages on the fly (multi-tier rollup per PRD is not implemented yet).
 
-See `AGENTS.md` for build/test commands and project conventions. PRD v2.0 is the single source of truth for requirements; implementation starts with P0 (core engine + IPC contract), then the QML plugin.
+## Development
+
+```sh
+go build ./...          # build everything
+go test ./...           # test suite (green before merging)
+golangci-lint run ./... # lint (zero issues tolerated)
+go run ./cmd/appscope   # run the CLI
+```
 
 ## Status
 
-Early development — P0 MVP in progress.
+P0 MVP + public history/report commands are done (daemon, CLI, systemd user service). Next up: threshold alerts, Omarchy QML plugin, packaging.
 
 ## Usage
 

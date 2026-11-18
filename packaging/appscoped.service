@@ -2,18 +2,16 @@
 Description=AppScope Application Resource Intelligence Service
 After=network.target
 
+# NOTE: no mount-namespace sandboxing (ProtectSystem/ProtectHome/PrivateTmp/ReadOnlyPaths).
+# Empirically, ANY namespace-creating directive makes /proc/<pid>/io unreadable
+# (EPERM, even for own-user processes), which silently kills per-app Disk I/O.
+# AppScope is read-only and runs as a normal user, so the namespace buys nothing here.
 [Service]
 Type=simple
 ExecStart=%h/.local/bin/appscope daemon run
 Restart=on-failure
 RestartSec=3s
-# NOTE: ReadWritePaths target must exist — create it before installing:
-#   mkdir -p ~/.local/share/appscope
-ProtectSystem=full
-ProtectHome=read-only
-ReadWritePaths=%h/.local/share/appscope %t
-ReadOnlyPaths=/proc /sys
-PrivateTmp=true
+NoNewPrivileges=true
 
 [Install]
 WantedBy=default.target

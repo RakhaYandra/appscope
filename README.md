@@ -17,3 +17,18 @@ See `AGENTS.md` for build/test commands and project conventions. PRD v2.0 is the
 ## Status
 
 Early development — P0 MVP in progress.
+
+## Usage
+
+```sh
+go build -o ~/.local/bin/appscope ./cmd/appscope
+appscope                 # system overview + top apps
+appscope top             # interactive TUI (j/k, c/m/d sort, / filter, K kill, q quit)
+appscope inspect <app>   # deep inspection + process tree
+appscope daemon run      # foreground collector (used by systemd)
+appscope daemon status   # via systemctl --user
+```
+
+Systemd user service: `cp packaging/appscoped.service ~/.config/systemd/user/ && systemctl --user enable --now appscoped`. The service deliberately avoids mount-namespace sandboxing — it makes `/proc/<pid>/io` unreadable and kills per-app disk I/O. AppScope is read-only and runs unprivileged.
+
+CLI uses the daemon's Unix socket when it is running, and falls back to a one-shot local sample otherwise.

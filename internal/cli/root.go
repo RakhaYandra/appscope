@@ -38,6 +38,7 @@ func NewRootCmd() *cobra.Command {
 		newInspectCmd(&socketPath),
 		newDaemonCmd(&socketPath),
 		newTopCmd(&socketPath),
+		newHistoryCmd(),
 	)
 	return root
 }

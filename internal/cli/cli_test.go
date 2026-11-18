@@ -80,6 +80,70 @@ func TestFormatUptime(t *testing.T) {
 	}
 }
 
+func TestSparklineEmpty(t *testing.T) {
+	if got := sparkline(nil); got != "" {
+		t.Errorf("empty = %q, want empty", got)
+	}
+}
+
+func TestSparklineConstant(t *testing.T) {
+	got := sparkline([]float64{5, 5, 5, 5})
+	runes := []rune(got)
+	for i, r := range runes {
+		if r != '▄' {
+			t.Errorf("rune %d = %q, want ▄ for constant series", i, r)
+		}
+	}
+}
+
+func TestSparklineMonotonic(t *testing.T) {
+	got := sparkline([]float64{0, 1, 2, 3, 4, 5, 6, 7})
+	runes := []rune(got)
+	if runes[0] != '▁' {
+		t.Errorf("first = %q, want ▁", runes[0])
+	}
+	if runes[len(runes)-1] != '█' {
+		t.Errorf("last = %q, want █", runes[len(runes)-1])
+	}
+	for i := 1; i < len(runes); i++ {
+		if runes[i] < runes[i-1] {
+			t.Errorf("rune %d decreased (%q < %q)", i, runes[i], runes[i-1])
+		}
+	}
+}
+
+func TestParseHistoryDuration(t *testing.T) {
+	cases := map[string]time.Duration{
+		"1h":  time.Hour,
+		"24h": 24 * time.Hour,
+		"7d":  7 * 24 * time.Hour,
+	}
+	for in, want := range cases {
+		got, err := parseHistoryDuration(in)
+		if err != nil {
+			t.Fatalf("parseHistoryDuration(%q): %v", in, err)
+		}
+		if got != want {
+			t.Errorf("parseHistoryDuration(%q) = %v, want %v", in, got, want)
+		}
+	}
+	if _, err := parseHistoryDuration("3w"); err == nil {
+		t.Error("expected error for unsupported duration")
+	}
+}
+
+func TestBucketSecondsFor(t *testing.T) {
+	if got := bucketSecondsFor(time.Hour, 60); got != 60 {
+		t.Errorf("1h/60 = %d, want 60", got)
+	}
+	if got := bucketSecondsFor(24*time.Hour, 60); got != 1440 {
+		t.Errorf("24h/60 = %d, want 1440", got)
+	}
+	if got := bucketSecondsFor(-time.Hour, 60); got != 1 {
+		t.Errorf("negative = %d, want 1", got)
+	}
+}
+
 func TestPrimaryPID(t *testing.T) {
 	if got := primaryPID([]int{300, 100, 200}); got != 100 {
 		t.Errorf("primaryPID = %d, want 100", got)
@@ -91,7 +155,7 @@ func TestPrimaryPID(t *testing.T) {
 
 func TestRootCmdHasSubcommands(t *testing.T) {
 	root := NewRootCmd()
-	for _, name := range []string{"top", "inspect", "daemon"} {
+	for _, name := range []string{"top", "inspect", "daemon", "history"} {
 		found := false
 		for _, c := range root.Commands() {
 			if c.Name() == name {

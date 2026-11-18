@@ -94,8 +94,11 @@ func (m topModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.confirming {
 			switch msg.String() {
-			case "y", "Y":
-				m.killSelected()
+			case "t", "T":
+				m.killSelected(syscall.SIGTERM)
+				m.confirming = false
+			case "k", "K":
+				m.killSelected(syscall.SIGKILL)
 				m.confirming = false
 			default:
 				m.confirming = false
@@ -143,7 +146,7 @@ func (m topModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *topModel) killSelected() {
+func (m *topModel) killSelected(sig syscall.Signal) {
 	apps := m.visibleApps()
 	if m.cursor >= len(apps) {
 		return
@@ -155,11 +158,18 @@ func (m *topModel) killSelected() {
 		if err != nil {
 			continue
 		}
-		if err := p.Signal(syscall.SIGTERM); err == nil {
+		if err := p.Signal(sig); err == nil {
 			killed++
 		}
 	}
-	m.status = fmt.Sprintf("sent SIGTERM to %d process(es) of %s", killed, target.Name)
+	m.status = fmt.Sprintf("sent %s to %d process(es) of %s", signalName(sig), killed, target.Name)
+}
+
+func signalName(sig syscall.Signal) string {
+	if sig == syscall.SIGKILL {
+		return "SIGKILL"
+	}
+	return "SIGTERM"
 }
 
 func (m topModel) View() string {
@@ -198,7 +208,7 @@ func (m topModel) View() string {
 		if m.cursor < len(apps) {
 			name = apps[m.cursor].Name
 		}
-		fmt.Fprintf(&b, "\nKill %s with SIGTERM? [y/N] ", name)
+		fmt.Fprintf(&b, "\nKill %s: [t] SIGTERM / [k] SIGKILL / any other key cancels ", name)
 	} else if m.status != "" {
 		fmt.Fprintf(&b, "\n%s\n", m.status)
 	}

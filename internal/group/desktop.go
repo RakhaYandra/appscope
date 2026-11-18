@@ -44,7 +44,7 @@ func parseDesktopEntry(path string) (name, exec string) {
 	if err != nil {
 		return "", ""
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	inEntry := false
 	scanner := bufio.NewScanner(f)

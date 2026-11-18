@@ -1,0 +1,19 @@
+[Unit]
+Description=AppScope Application Resource Intelligence Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/appscope daemon run
+Restart=on-failure
+RestartSec=3s
+# NOTE: ReadWritePaths target must exist — create it before installing:
+#   mkdir -p ~/.local/share/appscope
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/appscope %t
+ReadOnlyPaths=/proc /sys
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

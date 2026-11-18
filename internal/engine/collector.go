@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -142,6 +143,11 @@ func (c *Collector) readProcess(root string, pid int, now time.Time, sysJiffies 
 	var out processRead
 	dir := filepath.Join(root, "proc", strconv.Itoa(pid))
 
+	// kernel threads have an empty cmdline; they are not applications.
+	if cmdline, err := os.ReadFile(filepath.Join(dir, "cmdline")); err == nil && len(bytes.TrimRight(cmdline, "\x00")) == 0 {
+		return out, false
+	}
+
 	statRaw, err := os.ReadFile(filepath.Join(dir, "stat"))
 	if err != nil {
 		return out, false
@@ -160,13 +166,13 @@ func (c *Collector) readProcess(root string, pid int, now time.Time, sysJiffies 
 		return out, false
 	}
 
-	ioRaw, err := os.ReadFile(filepath.Join(dir, "io"))
-	if err != nil {
-		return out, false
-	}
-	readB, writeB, err := parseProcessIO(string(ioRaw))
-	if err != nil {
-		return out, false
+	// /proc/pid/io is owner-only and EPERM inside systemd mount namespaces;
+	// degrade to zero I/O rather than dropping the process.
+	var readB, writeB uint64
+	if ioRaw, err := os.ReadFile(filepath.Join(dir, "io")); err == nil {
+		if r, w, err := parseProcessIO(string(ioRaw)); err == nil {
+			readB, writeB = r, w
+		}
 	}
 
 	jiffies := pstat.UTime + pstat.STime

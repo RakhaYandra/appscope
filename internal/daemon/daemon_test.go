@@ -39,7 +39,7 @@ func TestTickPublishesSnapshotAndPersists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 
 	d := &Daemon{
 		Store:     st,
@@ -78,7 +78,7 @@ func TestRunStopsOnCancel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 
 	d := &Daemon{
 		Store:     st,

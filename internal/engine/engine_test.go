@@ -182,6 +182,74 @@ func TestCollectorSkipsVanishedProcess(t *testing.T) {
 	}
 }
 
+func TestCollectorToleratesUnreadableIO(t *testing.T) {
+	root := t.TempDir()
+	writeFile := func(rel, content string) {
+		full := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFile("proc/stat", "cpu  100 0 50 800 10 0 5 0 0 0\n")
+	writeFile("proc/meminfo", "MemTotal: 16000000 kB\nMemAvailable: 8000000 kB\n")
+	writeFile("proc/1234/stat", "1234 (firefox) S 1 1234 1234 0 -1 4194304 100 0 0 0 50 25 0 0 20 0 4 0 100 1000000 100 8000000 1000 2000 0 0 0 0 0 0 0 0 0 0 0 0 0\n")
+	writeFile("proc/1234/status", "VmSize:\t 100 kB\nVmRSS:\t 50 kB\nThreads:\t1\n")
+	writeFile("proc/1234/io", "read_bytes: 100\nwrite_bytes: 100\n")
+	if err := os.Chmod(filepath.Join(root, "proc/1234/io"), 0o000); err != nil {
+		t.Skipf("chmod not permitted: %v", err)
+	}
+
+	c := &Collector{Root: root, NumCores: 4, now: func() time.Time { return time.Unix(1000, 0) }}
+	s, err := c.Sample()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Processes) != 1 {
+		t.Fatalf("processes = %d, want 1 despite unreadable io", len(s.Processes))
+	}
+	p := s.Processes[0]
+	if p.DiskReadBps != 0 || p.DiskWriteBps != 0 {
+		t.Errorf("io should degrade to 0, got %d/%d", p.DiskReadBps, p.DiskWriteBps)
+	}
+	if p.MemoryRSSBytes != 50*1024 {
+		t.Errorf("rss = %d, want 51200 (cpu/mem must survive io denial)", p.MemoryRSSBytes)
+	}
+}
+
+func TestCollectorSkipsKernelThreads(t *testing.T) {
+	root := t.TempDir()
+	writeFile := func(rel, content string) {
+		full := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFile("proc/stat", "cpu  100 0 50 800 10 0 5 0 0 0\n")
+	writeFile("proc/meminfo", "MemTotal: 16000000 kB\nMemAvailable: 8000000 kB\n")
+	writeFile("proc/4242/stat", "4242 (kworker) S 0 4242 4242 0 -1 4194304 100 0 0 0 50 25 0 0 20 0 1 0 100 1000000 100 8000000 1000 2000 0 0 0 0 0 0 0 0 0 0 0 0 0\n")
+	writeFile("proc/4242/status", "VmSize:\t 0 kB\nVmRSS:\t 0 kB\nThreads:\t1\n")
+	writeFile("proc/4242/io", "read_bytes: 0\nwrite_bytes: 0\n")
+	writeFile("proc/4242/cmdline", "\x00")
+
+	c := &Collector{Root: root, NumCores: 4, now: func() time.Time { return time.Unix(1000, 0) }}
+	s, err := c.Sample()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Processes) != 0 {
+		t.Errorf("processes = %d, want 0 (kernel thread skipped)", len(s.Processes))
+	}
+	if s.System.ActiveProcesses != 0 {
+		t.Errorf("active = %d, want 0", s.System.ActiveProcesses)
+	}
+}
+
 func TestCollectorFirstSampleHasZeroRates(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "proc/stat", "cpu  100 0 50 800 10 0 5 0 0 0\n")

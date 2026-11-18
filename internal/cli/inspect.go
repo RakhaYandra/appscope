@@ -73,14 +73,14 @@ func runInspect(w io.Writer, socketPath, name string, pidFlag int, showTree bool
 }
 
 func printInspection(w io.Writer, a appView, source string) {
-	fmt.Fprintf(w, "AppScope Application Inspection — %s\n", a.Name)
-	fmt.Fprintf(w, "Target: %s (Grouped Application) | Source: %s\n", a.Name, source)
-	fmt.Fprintf(w, "Primary PID: %d | Processes: %d\n\n", primaryPID(a.PIDs), a.ProcessCount)
-	fmt.Fprintf(w, "RESOURCE CONSUMPTION\n")
-	fmt.Fprintf(w, "  CPU Usage         %.1f%%\n", a.CPUPercent)
-	fmt.Fprintf(w, "  Memory (RSS)      %s\n", humanBytes(a.MemoryRSSBytes))
-	fmt.Fprintf(w, "  Memory (VMS)      %s\n", humanBytes(a.MemoryVMSBytes))
-	fmt.Fprintf(w, "  Disk I/O Rate     Read: %s/s | Write: %s/s\n",
+	_, _ = fmt.Fprintf(w, "AppScope Application Inspection — %s\n", a.Name)
+	_, _ = fmt.Fprintf(w, "Target: %s (Grouped Application) | Source: %s\n", a.Name, source)
+	_, _ = fmt.Fprintf(w, "Primary PID: %d | Processes: %d\n\n", primaryPID(a.PIDs), a.ProcessCount)
+	_, _ = fmt.Fprintf(w, "RESOURCE CONSUMPTION\n")
+	_, _ = fmt.Fprintf(w, "  CPU Usage         %.1f%%\n", a.CPUPercent)
+	_, _ = fmt.Fprintf(w, "  Memory (RSS)      %s\n", humanBytes(a.MemoryRSSBytes))
+	_, _ = fmt.Fprintf(w, "  Memory (VMS)      %s\n", humanBytes(a.MemoryVMSBytes))
+	_, _ = fmt.Fprintf(w, "  Disk I/O Rate     Read: %s/s | Write: %s/s\n",
 		humanBytes(a.DiskReadBps), humanBytes(a.DiskWriteBps))
 }
 
@@ -109,7 +109,7 @@ func printProcessTree(w io.Writer, appPIDs []int) {
 	collector := engine.NewCollector()
 	sample, err := collector.Sample()
 	if err != nil {
-		fmt.Fprintf(w, "\nPROCESS TREE\n  (unavailable: %v)\n", err)
+		_, _ = fmt.Fprintf(w, "\nPROCESS TREE\n  (unavailable: %v)\n", err)
 		return
 	}
 	byPID := map[int]engine.ProcessMetrics{}
@@ -117,7 +117,7 @@ func printProcessTree(w io.Writer, appPIDs []int) {
 		byPID[p.PID] = p
 	}
 
-	fmt.Fprintf(w, "\nPROCESS TREE (%d processes)\n", len(appPIDs))
+	_, _ = fmt.Fprintf(w, "\nPROCESS TREE (%d processes)\n", len(appPIDs))
 	sort.Ints(appPIDs)
 	roots := make([]int, 0)
 	for _, p := range appPIDs {
@@ -134,7 +134,7 @@ func printProcessTree(w io.Writer, appPIDs []int) {
 			return
 		}
 		indent := strings.Repeat("  ", depth)
-		fmt.Fprintf(w, "%s%s (%d)\n", indent, proc.Comm, proc.PID)
+		_, _ = fmt.Fprintf(w, "%s%s (%d)\n", indent, proc.Comm, proc.PID)
 		printed[pid] = true
 		children := make([]int, 0)
 		for _, p := range appPIDs {

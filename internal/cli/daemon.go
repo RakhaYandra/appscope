@@ -73,7 +73,7 @@ func runDaemon(cmd *cobra.Command, socketPath string, interval time.Duration, db
 	if err != nil {
 		return err
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 
 	d := daemon.New(st)
 	d.Interval = interval
@@ -98,7 +98,6 @@ func runDaemon(cmd *cobra.Command, socketPath string, interval time.Duration, db
 		return err
 	case <-ctx.Done():
 		_ = srv.Close()
-		<-errCh
-		return nil
+		return <-errCh
 	}
 }

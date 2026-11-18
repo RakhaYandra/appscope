@@ -24,7 +24,7 @@ func Call(socketPath, method string, params map[string]interface{}) (map[string]
 	if err != nil {
 		return nil, fmt.Errorf("connect %s: %w", socketPath, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 	req := models.IPCRequest{JSONRPC: "2.0", Method: method, Params: params, ID: 1}

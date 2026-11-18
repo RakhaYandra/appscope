@@ -44,7 +44,7 @@ func NewServer(path string, src Source) (*Server, error) {
 		return nil, fmt.Errorf("listen %s: %w", path, err)
 	}
 	if err := os.Chmod(path, 0o600); err != nil {
-		ln.Close()
+		_ = ln.Close()
 		return nil, fmt.Errorf("chmod socket: %w", err)
 	}
 	return &Server{path: path, listener: ln, src: src, closed: make(chan struct{})}, nil
@@ -83,7 +83,7 @@ func (s *Server) Close() error {
 }
 
 func (s *Server) handle(conn net.Conn) {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 	line, err := bufio.NewReader(conn).ReadBytes('\n')
 	if err != nil && len(line) == 0 {

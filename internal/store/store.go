@@ -54,7 +54,7 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("open sqlite %s: %w", path, err)
 	}
 	if _, err := db.Exec(schema); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
 	return &Store{db: db}, nil
@@ -80,13 +80,13 @@ func (s *Store) InsertAppMetrics(apps []models.AppMetrics) error {
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	stmt, err := tx.Prepare(
 		"INSERT INTO application_metrics (timestamp, app_name, process_count, cpu_percent, memory_rss_bytes, disk_read_bytes, disk_write_bytes) VALUES (?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return fmt.Errorf("prepare insert: %w", err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 	now := time.Now().UTC().Format("2006-01-02 15:04:05")
 	for _, a := range apps {
 		if _, err := stmt.Exec(now, a.AppName, a.ProcessCount, a.CPUPercent, a.MemoryRSSBytes, a.DiskReadBps, a.DiskWriteBps); err != nil {
@@ -116,7 +116,7 @@ func (s *Store) AppMetricsSince(app string, since time.Time) ([]AppMetricsRow, e
 	if err != nil {
 		return nil, fmt.Errorf("query application_metrics: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []AppMetricsRow
 	for rows.Next() {
 		var r AppMetricsRow

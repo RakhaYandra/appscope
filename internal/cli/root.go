@@ -26,7 +26,7 @@ func NewRootCmd() *cobra.Command {
 					return nil
 				}
 				time.Sleep(interval)
-				fmt.Fprint(cmd.OutOrStdout(), "\033[H\033[2J")
+				_, _ = fmt.Fprint(cmd.OutOrStdout(), "\033[H\033[2J")
 			}
 		},
 	}
@@ -43,17 +43,17 @@ func NewRootCmd() *cobra.Command {
 }
 
 func printOverview(w io.Writer, v view) {
-	fmt.Fprintf(w, "AppScope — System Overview\n")
-	fmt.Fprintf(w, "Source: %s\n\n", v.Source)
+	_, _ = fmt.Fprintf(w, "AppScope — System Overview\n")
+	_, _ = fmt.Fprintf(w, "Source: %s\n\n", v.Source)
 	s := v.System
-	fmt.Fprintf(w, "CPU %.1f%% | RAM %.1f/%.1f GB | Disk R %.1f MB/s W %.1f MB/s | Procs %d\n\n",
+	_, _ = fmt.Fprintf(w, "CPU %.1f%% | RAM %.1f/%.1f GB | Disk R %.1f MB/s W %.1f MB/s | Procs %d\n\n",
 		s.CPUPercent, s.MemoryUsedGB, s.MemoryTotalGB, s.DiskReadMBps, s.DiskWriteMBps, s.ActiveProcesses)
-	fmt.Fprintf(w, "TOP APPS (by CPU)\n")
-	fmt.Fprintf(w, "  %-20s %-6s %-8s %-10s\n", "NAME", "PROCS", "CPU%", "RSS")
+	_, _ = fmt.Fprintf(w, "TOP APPS (by CPU)\n")
+	_, _ = fmt.Fprintf(w, "  %-20s %-6s %-8s %-10s\n", "NAME", "PROCS", "CPU%", "RSS")
 	for _, a := range v.Apps {
-		fmt.Fprintf(w, "  %-20s %-6d %-8.1f %-10s\n", a.Name, a.ProcessCount, a.CPUPercent, humanBytes(a.MemoryRSSBytes))
+		_, _ = fmt.Fprintf(w, "  %-20s %-6d %-8.1f %-10s\n", a.Name, a.ProcessCount, a.CPUPercent, humanBytes(a.MemoryRSSBytes))
 	}
 	if len(v.Apps) == 0 {
-		fmt.Fprintln(w, "  (no applications found)")
+		_, _ = fmt.Fprintln(w, "  (no applications found)")
 	}
 }

@@ -51,7 +51,7 @@ func startTestServer(t *testing.T, src Source) (string, func()) {
 	for time.Now().Before(deadline) {
 		conn, err := net.Dial("unix", path)
 		if err == nil {
-			conn.Close()
+			_ = conn.Close()
 			return path, stop
 		}
 		time.Sleep(5 * time.Millisecond)
@@ -66,7 +66,7 @@ func callRPC(t *testing.T, path, method string, params map[string]interface{}) (
 	if err != nil {
 		return models.IPCResponse{}, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	req := models.IPCRequest{JSONRPC: "2.0", Method: method, Params: params, ID: 1}
 	if err := json.NewEncoder(conn).Encode(req); err != nil {
 		return models.IPCResponse{}, err
@@ -167,7 +167,7 @@ func TestMalformedJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if _, err := conn.Write([]byte("{not json\n")); err != nil {
 		t.Fatal(err)
 	}

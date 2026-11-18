@@ -35,11 +35,13 @@ func parseProcStat(content string) (total, idle uint64, err error) {
 }
 
 type processStat struct {
-	Comm    string
-	PPID    int
-	UTime   uint64
-	STime   uint64
-	Threads int
+	Comm           string
+	State          string
+	PPID           int
+	UTime          uint64
+	STime          uint64
+	Threads        int
+	StartTimeTicks uint64
 }
 
 func parseProcessStat(pid int, line string) (processStat, error) {
@@ -52,15 +54,20 @@ func parseProcessStat(pid int, line string) (processStat, error) {
 	st.Comm = line[open+1 : closeIdx]
 
 	rest := strings.Fields(line[closeIdx+1:])
-	// rest[0] is field 3 (state); utime=field 14 → index 11, stime=field 15 → index 12
-	if len(rest) < 18 {
-		return st, fmt.Errorf("parse /proc/%d/stat: got %d trailing fields, want >= 18", pid, len(rest))
+	// rest[0] is field 3 (state); utime=field 14 → index 11, stime=field 15 → index 12, starttime=field 22 → index 19
+	if len(rest) < 20 {
+		return st, fmt.Errorf("parse /proc/%d/stat: got %d trailing fields, want >= 20", pid, len(rest))
 	}
+	st.State = rest[0]
 	ppid, err := strconv.Atoi(rest[1])
 	if err != nil {
 		return st, fmt.Errorf("parse /proc/%d/stat ppid: %w", pid, err)
 	}
 	st.PPID = ppid
+	st.StartTimeTicks, err = strconv.ParseUint(rest[19], 10, 64)
+	if err != nil {
+		return st, fmt.Errorf("parse /proc/%d/stat starttime: %w", pid, err)
+	}
 	st.UTime, err = strconv.ParseUint(rest[11], 10, 64)
 	if err != nil {
 		return st, fmt.Errorf("parse /proc/%d/stat utime: %w", pid, err)
@@ -76,7 +83,8 @@ func parseProcessStat(pid int, line string) (processStat, error) {
 	return st, nil
 }
 
-func parseProcessStatus(content string) (vmRSS, vmSize uint64, threads int, err error) {
+func parseProcessStatus(content string) (vmRSS, vmSize uint64, threads, uid int, err error) {
+	uid = -1
 	for _, line := range strings.Split(content, "\n") {
 		key, val, ok := strings.Cut(line, ":")
 		if !ok {
@@ -87,24 +95,33 @@ func parseProcessStatus(content string) (vmRSS, vmSize uint64, threads int, err 
 		case "VmRSS":
 			kb, err := strconv.ParseUint(val, 10, 64)
 			if err != nil {
-				return 0, 0, 0, fmt.Errorf("parse VmRSS: %w", err)
+				return 0, 0, 0, -1, fmt.Errorf("parse VmRSS: %w", err)
 			}
 			vmRSS = kb * 1024
 		case "VmSize":
 			kb, err := strconv.ParseUint(val, 10, 64)
 			if err != nil {
-				return 0, 0, 0, fmt.Errorf("parse VmSize: %w", err)
+				return 0, 0, 0, -1, fmt.Errorf("parse VmSize: %w", err)
 			}
 			vmSize = kb * 1024
 		case "Threads":
 			n, err := strconv.Atoi(strings.TrimSpace(val))
 			if err != nil {
-				return 0, 0, 0, fmt.Errorf("parse Threads: %w", err)
+				return 0, 0, 0, -1, fmt.Errorf("parse Threads: %w", err)
 			}
 			threads = n
+		case "Uid":
+			fields := strings.Fields(val)
+			if len(fields) > 0 {
+				n, err := strconv.Atoi(fields[0])
+				if err != nil {
+					return 0, 0, 0, -1, fmt.Errorf("parse Uid: %w", err)
+				}
+				uid = n
+			}
 		}
 	}
-	return vmRSS, vmSize, threads, nil
+	return vmRSS, vmSize, threads, uid, nil
 }
 
 func parseProcessIO(content string) (readBytes, writeBytes uint64, err error) {
@@ -148,4 +165,18 @@ func parseMeminfo(content string) (total, available uint64, err error) {
 		return 0, 0, fmt.Errorf("parse meminfo: MemTotal not found")
 	}
 	return total, available, nil
+}
+
+func parseBtime(content string) (uint64, error) {
+	for _, line := range strings.Split(content, "\n") {
+		if !strings.HasPrefix(line, "btime ") {
+			continue
+		}
+		v, err := strconv.ParseUint(strings.TrimSpace(line[len("btime "):]), 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("parse btime: %w", err)
+		}
+		return v, nil
+	}
+	return 0, fmt.Errorf("parse btime: btime line not found")
 }

@@ -50,11 +50,31 @@ func TestParseProcessStatWithSpacesInComm(t *testing.T) {
 	if st.Threads != 11 {
 		t.Errorf("threads = %d, want 11", st.Threads)
 	}
+	if st.State != "S" {
+		t.Errorf("state = %q, want S", st.State)
+	}
+	if st.StartTimeTicks != 999 {
+		t.Errorf("starttime = %d, want 999 (field 22)", st.StartTimeTicks)
+	}
+}
+
+func TestParseBtime(t *testing.T) {
+	content := "cpu  100 0 50 800 10 0 5 0 0 0\nbtime 1700000000\n"
+	btime, err := parseBtime(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if btime != 1700000000 {
+		t.Errorf("btime = %d", btime)
+	}
+	if _, err := parseBtime("cpu  1 2 3\n"); err == nil {
+		t.Error("expected error when btime line missing")
+	}
 }
 
 func TestParseProcessStatus(t *testing.T) {
-	content := "Name:\tfirefox\nState:\tS (sleeping)\nVmSize:\t 7000000 kB\nVmRSS:\t 2500000 kB\nThreads:\t42\n"
-	vmRSS, vmSize, threads, err := parseProcessStatus(content)
+	content := "Name:\tfirefox\nState:\tS (sleeping)\nUid:\t1000\t1000\t1000\t1000\nVmSize:\t 7000000 kB\nVmRSS:\t 2500000 kB\nThreads:\t42\n"
+	vmRSS, vmSize, threads, uid, err := parseProcessStatus(content)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,6 +86,9 @@ func TestParseProcessStatus(t *testing.T) {
 	}
 	if threads != 42 {
 		t.Errorf("threads = %d", threads)
+	}
+	if uid != 1000 {
+		t.Errorf("uid = %d, want 1000", uid)
 	}
 }
 
@@ -247,6 +270,35 @@ func TestCollectorSkipsKernelThreads(t *testing.T) {
 	}
 	if s.System.ActiveProcesses != 0 {
 		t.Errorf("active = %d, want 0", s.System.ActiveProcesses)
+	}
+}
+
+func TestSampleComputesStartTimeFromBtime(t *testing.T) {
+	root := t.TempDir()
+	writeFile := func(rel, content string) {
+		full := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFile("proc/stat", "cpu  100 0 50 800 10 0 5 0 0 0\nbtime 1700000000\n")
+	writeFile("proc/meminfo", "MemTotal: 16000000 kB\nMemAvailable: 8000000 kB\n")
+	writeFile("proc/1234/stat", "1234 (firefox) S 1 1234 1234 0 -1 4194304 100 0 0 0 50 25 0 0 20 0 4 0 1000000 0 100 8000000 1000 2000 0 0 0 0 0 0 0 0 0 0 0 0 0\n")
+	writeFile("proc/1234/status", "VmSize:\t 100 kB\nVmRSS:\t 50 kB\nThreads:\t1\nUid:\t1000\t1000\t1000\t1000\n")
+	writeFile("proc/1234/io", "read_bytes: 100\nwrite_bytes: 100\n")
+
+	c := &Collector{Root: root, NumCores: 4, now: func() time.Time { return time.Unix(1700002000, 0) }}
+	s, err := c.Sample()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := s.Processes[0]
+	want := time.Unix(1700000000+1000000/100, 0)
+	if !p.StartTime.Equal(want) {
+		t.Errorf("starttime = %v, want %v", p.StartTime, want)
 	}
 }
 

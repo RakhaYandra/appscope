@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPrintOverviewRendersSections(t *testing.T) {
@@ -61,6 +62,20 @@ func TestHumanBytes(t *testing.T) {
 	for in, want := range cases {
 		if got := humanBytes(in); got != want {
 			t.Errorf("humanBytes(%d) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestFormatUptime(t *testing.T) {
+	cases := map[time.Duration]string{
+		45 * time.Minute:             "45m",
+		2*time.Hour + 14*time.Minute: "02h 14m",
+		3*24*time.Hour + 2*time.Hour: "3d 2h",
+		90 * time.Second:             "1m 30s",
+	}
+	for in, want := range cases {
+		if got := formatUptime(in); got != want {
+			t.Errorf("formatUptime(%v) = %q, want %q", in, got, want)
 		}
 	}
 }

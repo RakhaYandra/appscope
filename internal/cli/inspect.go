@@ -3,8 +3,11 @@ package cli
 import (
 	"fmt"
 	"io"
+	"os/user"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -65,23 +68,102 @@ func runInspect(w io.Writer, socketPath, name string, pidFlag int, showTree bool
 		}
 	}
 
-	printInspection(w, *target, v.Source)
+	extra := gatherLocalExtras(target.PIDs)
+	printInspection(w, *target, v.Source, extra)
 	if showTree {
 		printProcessTree(w, target.PIDs)
 	}
 	return nil
 }
 
-func printInspection(w io.Writer, a appView, source string) {
+type inspectExtra struct {
+	user    string
+	state   string
+	uptime  string
+	threads int
+}
+
+func gatherLocalExtras(pids []int) inspectExtra {
+	var extra inspectExtra
+	collector := engine.NewCollector()
+	sample, err := collector.Sample()
+	if err != nil {
+		return extra
+	}
+	primary := primaryPID(pids)
+	pidSet := make(map[int]bool, len(pids))
+	for _, pid := range pids {
+		pidSet[pid] = true
+	}
+	for _, p := range sample.Processes {
+		if !pidSet[p.PID] {
+			continue
+		}
+		extra.threads += p.Threads
+		if p.PID != primary {
+			continue
+		}
+		if p.State != "" {
+			extra.state = p.State
+		}
+		if p.Uid >= 0 {
+			if u, err := user.LookupId(strconv.Itoa(p.Uid)); err == nil {
+				extra.user = u.Username
+			} else {
+				extra.user = strconv.Itoa(p.Uid)
+			}
+		}
+		if !p.StartTime.IsZero() {
+			extra.uptime = formatUptime(time.Since(p.StartTime))
+		}
+	}
+	return extra
+}
+
+func printInspection(w io.Writer, a appView, source string, extra inspectExtra) {
 	_, _ = fmt.Fprintf(w, "AppScope Application Inspection — %s\n", a.Name)
 	_, _ = fmt.Fprintf(w, "Target: %s (Grouped Application) | Source: %s\n", a.Name, source)
-	_, _ = fmt.Fprintf(w, "Primary PID: %d | Processes: %d\n\n", primaryPID(a.PIDs), a.ProcessCount)
+	details := []string{fmt.Sprintf("Primary PID: %d", primaryPID(a.PIDs))}
+	if extra.state != "" {
+		details = append(details, "Status: "+extra.state)
+	}
+	if extra.user != "" {
+		details = append(details, "User: "+extra.user)
+	}
+	if extra.uptime != "" {
+		details = append(details, "Uptime: "+extra.uptime)
+	}
+	details = append(details, fmt.Sprintf("Processes: %d", a.ProcessCount))
+	_, _ = fmt.Fprintf(w, "%s\n\n", strings.Join(details, " | "))
 	_, _ = fmt.Fprintf(w, "RESOURCE CONSUMPTION\n")
 	_, _ = fmt.Fprintf(w, "  CPU Usage         %.1f%%\n", a.CPUPercent)
 	_, _ = fmt.Fprintf(w, "  Memory (RSS)      %s\n", humanBytes(a.MemoryRSSBytes))
 	_, _ = fmt.Fprintf(w, "  Memory (VMS)      %s\n", humanBytes(a.MemoryVMSBytes))
+	if extra.threads > 0 {
+		_, _ = fmt.Fprintf(w, "  Threads           %d\n", extra.threads)
+	}
 	_, _ = fmt.Fprintf(w, "  Disk I/O Rate     Read: %s/s | Write: %s/s\n",
 		humanBytes(a.DiskReadBps), humanBytes(a.DiskWriteBps))
+}
+
+func formatUptime(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	s := int(d.Seconds())
+	days, hours, mins, secs := s/86400, (s%86400)/3600, (s%3600)/60, s%60
+	switch {
+	case days > 0:
+		return fmt.Sprintf("%dd %dh", days, hours)
+	case hours > 0:
+		return fmt.Sprintf("%02dh %02dm", hours, mins)
+	case s < 120:
+		return fmt.Sprintf("%dm %ds", mins, secs)
+	case mins > 0:
+		return fmt.Sprintf("%dm", mins)
+	default:
+		return fmt.Sprintf("%ds", secs)
+	}
 }
 
 func primaryPID(pids []int) int {

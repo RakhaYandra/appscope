@@ -16,6 +16,9 @@ type ProcessMetrics struct {
 	PID            int
 	PPID           int
 	Comm           string
+	State          string
+	Uid            int
+	StartTime      time.Time
 	CPUPercent     float64
 	MemoryRSSBytes uint64
 	MemoryVMSBytes uint64
@@ -78,6 +81,7 @@ func (c *Collector) Sample() (*Sample, error) {
 	if err != nil {
 		return nil, err
 	}
+	bootTime, btimeErr := parseBtime(string(statRaw))
 
 	memRaw, err := os.ReadFile(filepath.Join(root, "proc", "meminfo"))
 	if err != nil {
@@ -98,7 +102,7 @@ func (c *Collector) Sample() (*Sample, error) {
 
 	var sysDiskRead, sysDiskWrite uint64
 	for _, pid := range pids {
-		pm, ok := c.readProcess(root, pid, now, sysJiffies)
+		pm, ok := c.readProcess(root, pid, now, sysJiffies, bootTime, btimeErr == nil)
 		if !ok {
 			continue
 		}
@@ -139,7 +143,7 @@ type processRead struct {
 	baseline processBaseline
 }
 
-func (c *Collector) readProcess(root string, pid int, now time.Time, sysJiffies uint64) (processRead, bool) {
+func (c *Collector) readProcess(root string, pid int, now time.Time, sysJiffies, bootTime uint64, hasBootTime bool) (processRead, bool) {
 	var out processRead
 	dir := filepath.Join(root, "proc", strconv.Itoa(pid))
 
@@ -161,7 +165,7 @@ func (c *Collector) readProcess(root string, pid int, now time.Time, sysJiffies 
 	if err != nil {
 		return out, false
 	}
-	vmRSS, vmSize, _, err := parseProcessStatus(string(statusRaw))
+	vmRSS, vmSize, _, uid, err := parseProcessStatus(string(statusRaw))
 	if err != nil {
 		return out, false
 	}
@@ -180,9 +184,15 @@ func (c *Collector) readProcess(root string, pid int, now time.Time, sysJiffies 
 		PID:            pid,
 		PPID:           pstat.PPID,
 		Comm:           pstat.Comm,
+		State:          pstat.State,
+		Uid:            uid,
 		MemoryRSSBytes: vmRSS,
 		MemoryVMSBytes: vmSize,
 		Threads:        pstat.Threads,
+	}
+	// kernel USER_HZ is 100 on all tier-1 architectures
+	if hasBootTime {
+		out.metrics.StartTime = time.Unix(int64(bootTime)+int64(pstat.StartTimeTicks/100), 0)
 	}
 	out.baseline = processBaseline{jiffies: jiffies, readBytes: readB, writeBytes: writeB}
 

@@ -94,6 +94,59 @@ func TestInsertAndQueryAppMetricsSince(t *testing.T) {
 	}
 }
 
+func TestOpenInvalidPathFails(t *testing.T) {
+	if _, err := Open(filepath.Join(t.TempDir(), "no-such-dir", "appscope.db")); err == nil {
+		t.Fatal("expected error for unwritable path")
+	}
+}
+
+func TestLatestSystemMetricsEmptyDBFails(t *testing.T) {
+	s := openTemp(t)
+	if _, err := s.LatestSystemMetrics(); err == nil {
+		t.Fatal("expected error on empty database")
+	}
+}
+
+func TestAppMetricsSinceNoRows(t *testing.T) {
+	s := openTemp(t)
+	rows, err := s.AppMetricsSince("nonexistent", time.Now().Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 0 {
+		t.Errorf("rows = %d, want 0", len(rows))
+	}
+}
+
+func TestInsertAppMetricsMultipleApps(t *testing.T) {
+	s := openTemp(t)
+	err := s.InsertAppMetrics([]models.AppMetrics{
+		{AppName: "a", ProcessCount: 1, CPUPercent: 1, MemoryRSSBytes: 1},
+		{AppName: "b", ProcessCount: 2, CPUPercent: 2, MemoryRSSBytes: 2},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := s.AppMetricsSince("b", time.Now().Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].ProcessCount != 2 {
+		t.Errorf("rows = %+v", rows)
+	}
+}
+
+func TestPruneOnEmptyDatabase(t *testing.T) {
+	s := openTemp(t)
+	n, err := s.Prune(time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("pruned = %d, want 0", n)
+	}
+}
+
 func TestPruneDeletesOldRows(t *testing.T) {
 	s := openTemp(t)
 	old := time.Now().UTC().Add(-8 * 24 * time.Hour)

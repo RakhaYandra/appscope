@@ -19,6 +19,8 @@ func TestScopeAppName(t *testing.T) {
 		{"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-flatpak-org.mozilla.firefox-5678.scope\n", "firefox", true},
 		{"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-kde-org.kde.kate-42.scope\n", "kate", true},
 		{"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.TextEditor-99.scope\n", "TextEditor", true},
+		{"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-Hyprland-gtk\\x2dlaunch-b23018c3.scope\n", "Hyprland-gtk-launch", true},
+		{"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-gnome-my-app-deadbeef.scope\n", "my-app", true},
 		{"0::/user.slice/user-1000.slice/session.slice/wayland-wm@wayland-0.service\n", "", false},
 		{"0::/init.scope\n", "", false},
 		{"0::/user.slice\n", "", false},

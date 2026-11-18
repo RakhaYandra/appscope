@@ -6,6 +6,7 @@ import (
 )
 
 var appScopeRe = regexp.MustCompile(`^app-(.+)\.scope$`)
+var instanceIDRe = regexp.MustCompile(`^([0-9]+|[0-9a-f]{6,})$`)
 
 var launcherPrefixes = map[string]bool{
 	"gnome": true, "kde": true, "plasma": true, "flatpak": true,
@@ -18,7 +19,7 @@ func scopeAppName(cgroupContent string) (string, bool) {
 		if len(parts) != 3 {
 			continue
 		}
-		path := parts[2]
+		path := strings.ReplaceAll(parts[2], `\x2d`, "-")
 		base := path[strings.LastIndex(path, "/")+1:]
 		m := appScopeRe.FindStringSubmatch(base)
 		if m == nil {
@@ -34,7 +35,7 @@ func scopeAppName(cgroupContent string) (string, bool) {
 func normalizeScopeInner(inner string) string {
 	tokens := strings.Split(inner, "-")
 	end := len(tokens)
-	for end > 0 && isAllDigits(tokens[end-1]) {
+	for end > 0 && instanceIDRe.MatchString(tokens[end-1]) {
 		end--
 	}
 	tokens = tokens[:end]
@@ -52,16 +53,4 @@ func normalizeScopeInner(inner string) string {
 		return last
 	}
 	return strings.Join(tokens, "-")
-}
-
-func isAllDigits(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
 }

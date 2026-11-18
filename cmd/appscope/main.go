@@ -1,7 +1,15 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+
+	"github.com/RakhaYandra/appscope/internal/cli"
+)
 
 func main() {
-	fmt.Println("appscope 0.0.0-dev")
+	if err := cli.NewRootCmd().Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, "appscope:", err)
+		os.Exit(1)
+	}
 }

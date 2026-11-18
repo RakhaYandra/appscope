@@ -1,5 +1,6 @@
 /bin/
 /dist/
+/appscope
 *.db
 *.db-wal
 *.db-shm

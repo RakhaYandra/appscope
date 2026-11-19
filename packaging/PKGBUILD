@@ -1,0 +1,29 @@
+pkgname=appscope-cli
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Lightweight application resource intelligence for Linux — daemon + CLI (one engine, two interfaces)"
+arch=('x86_64')
+url="https://github.com/RakhaYandra/appscope"
+license=('MIT')
+makedepends=('go' 'gcc')
+optdepends=('notify-send: desktop threshold alert notifications'
+            'omarchy-appscope-plugin: Omarchy bar widget & panel (uses the appscope daemon socket)')
+source=("git+https://github.com/RakhaYandra/appscope.git#tag=v${pkgver}")
+sha256sums=('SKIP')
+backup=()
+
+build() {
+  cd "appscope"
+  export CGO_ENABLED=1
+  export GOFLAGS=-buildvcs=false
+  go build -ldflags="-s -w -X github.com/RakhaYandra/appscope/internal/cli.Version=v${pkgver}" \
+    -o bin/appscope ./cmd/appscope
+}
+
+package() {
+  cd "appscope"
+  install -Dm755 bin/appscope "${pkgdir}/usr/bin/appscope"
+  install -Dm644 packaging/appscoped.service "${pkgdir}/usr/lib/systemd/user/appscoped.service"
+  install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 README.md "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+}

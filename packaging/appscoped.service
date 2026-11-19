@@ -8,7 +8,7 @@ After=network.target
 # AppScope is read-only and runs as a normal user, so the namespace buys nothing here.
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/appscope daemon run
+ExecStart=/usr/bin/appscope daemon run
 Restart=on-failure
 RestartSec=3s
 NoNewPrivileges=true

@@ -23,7 +23,24 @@ go run ./cmd/appscope   # run the CLI
 
 ## Status
 
-P0 MVP + public history/report commands are done (daemon, CLI, systemd user service). Next up: threshold alerts, Omarchy QML plugin, packaging.
+v0.1.0 — CLI P0 MVP + P1 (overview, top, inspect, history, report, alert) done; released via GitHub Release. Omarchy QML plugin planned next.
+
+## Install
+
+**From GitHub Release (x86_64):**
+
+```sh
+curl -L https://github.com/RakhaYandra/appscope/releases/download/v0.1.0/appscope-linux-amd64 -o ~/.local/bin/appscope
+chmod +x ~/.local/bin/appscope
+mkdir -p ~/.config/systemd/user ~/.local/share/appscope
+sed 's|/usr/bin/appscope|'"$HOME"'/.local/bin/appscope|' packaging/appscoped.service > ~/.config/systemd/user/appscoped.service
+systemctl --user daemon-reload
+systemctl --user enable --now appscoped.service
+```
+
+**From source:** `go build -o ~/.local/bin/appscope ./cmd/appscope`
+
+**Arch Linux:** `packaging/PKGBUILD` builds `appscope-cli` (binary + systemd user unit at `/usr/lib/systemd/user/appscoped.service`). AUR submission pending.
 
 ## Usage
 
@@ -36,6 +53,6 @@ appscope daemon run      # foreground collector (used by systemd)
 appscope daemon status   # via systemctl --user
 ```
 
-Systemd user service: `cp packaging/appscoped.service ~/.config/systemd/user/ && systemctl --user enable --now appscoped`. The service deliberately avoids mount-namespace sandboxing — it makes `/proc/<pid>/io` unreadable and kills per-app disk I/O. AppScope is read-only and runs unprivileged.
+Systemd user service: see Install. The service deliberately avoids mount-namespace sandboxing — it makes `/proc/<pid>/io` unreadable and kills per-app disk I/O. AppScope is read-only and runs unprivileged.
 
 CLI uses the daemon's Unix socket when it is running, and falls back to a one-shot local sample otherwise.

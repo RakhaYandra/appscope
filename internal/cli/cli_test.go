@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/RakhaYandra/appscope/internal/store"
 )
 
 func TestPrintOverviewRendersSections(t *testing.T) {
@@ -153,9 +155,41 @@ func TestPrimaryPID(t *testing.T) {
 	}
 }
 
+func TestFormatAlertRules(t *testing.T) {
+	var buf bytes.Buffer
+	formatAlertRules(&buf, []store.AlertRule{
+		{ID: 1, AppName: "firefox", Metric: "cpu_percent", Threshold: 80, Enabled: true},
+		{ID: 2, AppName: "*", Metric: "memory_rss_bytes", Threshold: 4e9, Enabled: false},
+	})
+	out := buf.String()
+	for _, want := range []string{"ID", "firefox", "cpu_percent", "80.0", "*", "memory_rss_bytes", "enabled", "disabled"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("alert list output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestParseAlertMetricArg(t *testing.T) {
+	if err := validateAlertInputs("firefox", "cpu_percent", 80); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		app, metric string
+		threshold   float64
+	}{
+		{"", "cpu_percent", 80},
+		{"firefox", "bogus", 80},
+		{"firefox", "cpu_percent", 0},
+	} {
+		if err := validateAlertInputs(tc.app, tc.metric, tc.threshold); err == nil {
+			t.Errorf("validateAlertInputs(%q, %q, %f) should fail", tc.app, tc.metric, tc.threshold)
+		}
+	}
+}
+
 func TestRootCmdHasSubcommands(t *testing.T) {
 	root := NewRootCmd()
-	for _, name := range []string{"top", "inspect", "daemon", "history", "report"} {
+	for _, name := range []string{"top", "inspect", "daemon", "history", "report", "alert"} {
 		found := false
 		for _, c := range root.Commands() {
 			if c.Name() == name {

@@ -40,6 +40,7 @@ func NewRootCmd() *cobra.Command {
 		newTopCmd(&socketPath),
 		newHistoryCmd(),
 		newReportCmd(),
+		newAlertCmd(),
 	)
 	return root
 }

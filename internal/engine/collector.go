@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -47,6 +48,7 @@ type Collector struct {
 
 	prevSysJiffies uint64
 	prevIdle       uint64
+	prevCPU        cpuStats
 	prevProc       map[int]processBaseline
 	prevTime       time.Time
 	hasBaseline    bool
@@ -77,10 +79,11 @@ func (c *Collector) Sample() (*Sample, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read procfs stat: %w", err)
 	}
-	sysJiffies, sysIdle, err := parseProcStat(string(statRaw))
+	cols, err := parseProcStatColumns(string(statRaw))
 	if err != nil {
 		return nil, err
 	}
+	sysJiffies, sysIdle := cols.Total(), cols.Idle+cols.Iowait
 	bootTime, btimeErr := parseBtime(string(statRaw))
 
 	memRaw, err := os.ReadFile(filepath.Join(root, "proc", "meminfo"))
@@ -128,7 +131,12 @@ func (c *Collector) Sample() (*Sample, error) {
 		dTotal := sysJiffies - c.prevSysJiffies
 		dIdle := sysIdle - c.prevIdle
 		sample.System.CPUPercent = float64(dTotal-dIdle) / float64(dTotal) * 100.0
+		if sample.System.CPUPercent > spikeThreshold {
+			log.Printf("cpu spike: %s", formatCPUSpike(c.prevCPU, cols, sample.System.CPUPercent))
+		}
 	}
+
+	c.prevCPU = cols
 
 	c.prevSysJiffies = sysJiffies
 	c.prevIdle = sysIdle
@@ -136,6 +144,22 @@ func (c *Collector) Sample() (*Sample, error) {
 	c.prevTime = now
 	c.hasBaseline = true
 	return sample, nil
+}
+
+const spikeThreshold = 70.0
+
+func formatCPUSpike(prev, cur cpuStats, cpuPercent float64) string {
+	delta := func(a, b uint64) uint64 {
+		if b >= a {
+			return b - a
+		}
+		return 0
+	}
+	return fmt.Sprintf("cpu_percent=%.1f user=%d nice=%d system=%d idle=%d iowait=%d irq=%d softirq=%d steal=%d",
+		cpuPercent,
+		delta(prev.User, cur.User), delta(prev.Nice, cur.Nice), delta(prev.System, cur.System),
+		delta(prev.Idle, cur.Idle), delta(prev.Iowait, cur.Iowait),
+		delta(prev.Irq, cur.Irq), delta(prev.Softirq, cur.Softirq), delta(prev.Steal, cur.Steal))
 }
 
 type processRead struct {

@@ -6,32 +6,46 @@ import (
 	"strings"
 )
 
-func parseProcStat(content string) (total, idle uint64, err error) {
+type cpuStats struct {
+	User, Nice, System, Idle, Iowait, Irq, Softirq, Steal uint64
+}
+
+func (c cpuStats) Total() uint64 {
+	return c.User + c.Nice + c.System + c.Idle + c.Iowait + c.Irq + c.Softirq + c.Steal
+}
+
+func parseProcStatColumns(content string) (cpuStats, error) {
+	var cols cpuStats
 	for _, line := range strings.Split(content, "\n") {
 		if !strings.HasPrefix(line, "cpu ") {
 			continue
 		}
 		fields := strings.Fields(line[len("cpu "):])
 		if len(fields) < 8 {
-			return 0, 0, fmt.Errorf("parse /proc/stat: got %d fields, want >= 8", len(fields))
+			return cols, fmt.Errorf("parse /proc/stat: got %d fields, want >= 8", len(fields))
 		}
-		vals := make([]uint64, 0, len(fields))
-		for _, f := range fields {
-			v, err := strconv.ParseUint(f, 10, 64)
+		vals := make([]uint64, 8)
+		for i := 0; i < 8; i++ {
+			v, err := strconv.ParseUint(fields[i], 10, 64)
 			if err != nil {
-				return 0, 0, fmt.Errorf("parse /proc/stat field %q: %w", f, err)
+				return cols, fmt.Errorf("parse /proc/stat field %q: %w", fields[i], err)
 			}
-			vals = append(vals, v)
+			vals[i] = v
 		}
-		for i, v := range vals[:8] {
-			total += v
-			if i == 3 || i == 4 {
-				idle += v
-			}
-		}
-		return total, idle, nil
+		cols = cpuStats{User: vals[0], Nice: vals[1], System: vals[2], Idle: vals[3], Iowait: vals[4], Irq: vals[5], Softirq: vals[6], Steal: vals[7]}
+		return cols, nil
 	}
-	return 0, 0, fmt.Errorf("parse /proc/stat: aggregate 'cpu' line not found")
+	return cols, fmt.Errorf("parse /proc/stat: aggregate 'cpu' line not found")
+}
+
+func parseProcStat(content string) (total, idle uint64, err error) {
+	cols, err := parseProcStatColumns(content)
+	if err != nil {
+		return 0, 0, err
+	}
+	total = cols.Total()
+	idle = cols.Idle + cols.Iowait
+	return total, idle, nil
 }
 
 type processStat struct {

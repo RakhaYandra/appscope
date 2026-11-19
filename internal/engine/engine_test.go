@@ -3,6 +3,7 @@ package engine
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -15,6 +16,32 @@ func writeFile(t *testing.T, root, rel string, content string) {
 	}
 	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestParseProcStatColumns(t *testing.T) {
+	content := "cpu  100 10 50 800 20 3 5 7 0 0\n"
+	cols, err := parseProcStatColumns(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cols.User != 100 || cols.Nice != 10 || cols.System != 50 || cols.Idle != 800 || cols.Iowait != 20 || cols.Irq != 3 || cols.Softirq != 5 || cols.Steal != 7 {
+		t.Errorf("cols = %+v", cols)
+	}
+	total := cols.Total()
+	if total != 100+10+50+800+20+3+5+7 {
+		t.Errorf("total = %d", total)
+	}
+}
+
+func TestFormatCPUSpike(t *testing.T) {
+	prev := cpuStats{User: 100, Nice: 0, System: 50, Idle: 800, Iowait: 10, Irq: 1, Softirq: 1, Steal: 0}
+	cur := cpuStats{User: 110, Nice: 0, System: 70, Idle: 802, Iowait: 15, Irq: 5, Softirq: 9, Steal: 0}
+	got := formatCPUSpike(prev, cur, 96.5)
+	for _, want := range []string{"cpu_percent=96.5", "user=10", "system=20", "iowait=5", "irq=4", "softirq=8", "idle=2"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("spike log missing %q in %q", want, got)
+		}
 	}
 }
 

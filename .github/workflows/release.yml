@@ -21,7 +21,7 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: |
-          CGO_ENABLED=1 go build \
+          CGO_ENABLED=1 go build -trimpath \
             -ldflags="-s -w -X github.com/RakhaYandra/appscope/internal/cli.Version=${TAG}" \
             -o appscope-linux-amd64 ./cmd/appscope
           sha256sum appscope-linux-amd64 > appscope-linux-amd64.sha256

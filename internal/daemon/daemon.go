@@ -17,6 +17,7 @@ type Daemon struct {
 	Collector *engine.Collector
 	Grouper   *group.Grouper
 	Interval  time.Duration
+	Alerts    *AlertEvaluator
 
 	state atomic.Value
 }
@@ -27,6 +28,7 @@ func New(st *store.Store) *Daemon {
 		Collector: engine.NewCollector(),
 		Grouper:   &group.Grouper{},
 		Interval:  time.Second,
+		Alerts:    newAlertEvaluator(st),
 	}
 }
 
@@ -49,6 +51,9 @@ func (d *Daemon) Tick() error {
 		System:    sample.System,
 		Apps:      apps,
 	})
+	if d.Alerts != nil {
+		d.Alerts.Evaluate(apps)
+	}
 	return nil
 }
 

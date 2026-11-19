@@ -14,6 +14,7 @@ import (
 
 type topModel struct {
 	socketPath string
+	limit      int
 	apps       []appView
 	cursor     int
 	sortKey    string
@@ -30,28 +31,36 @@ type refreshMsg struct{ view view }
 type tickMsg struct{}
 
 func newTopCmd(socketPath *string) *cobra.Command {
-	var interval int
+	var limit int
+	var sortKey string
 	cmd := &cobra.Command{
 		Use:   "top",
 		Short: "Interactive TUI of the heaviest applications",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			m := newTopModel(*socketPath)
+			switch sortKey {
+			case "cpu", "memory", "disk":
+			default:
+				return fmt.Errorf("invalid --sort %q (want cpu|memory|disk)", sortKey)
+			}
+			m := newTopModel(*socketPath, sortKey, limit)
 			p := tea.NewProgram(m, tea.WithAltScreen())
 			_, err := p.Run()
 			return err
 		},
 	}
-	cmd.Flags().IntVar(&interval, "limit", 50, "max applications to show")
+	cmd.Flags().IntVar(&limit, "limit", 50, "max applications to show")
+	cmd.Flags().StringVar(&sortKey, "sort", "cpu", "sort by cpu|memory|disk")
 	return cmd
 }
 
-func newTopModel(socketPath string) topModel {
+func newTopModel(socketPath, sortKey string, limit int) topModel {
 	fi := textinput.New()
 	fi.Placeholder = "filter app name..."
 	fi.CharLimit = 64
 	return topModel{
 		socketPath: socketPath,
-		sortKey:    "cpu",
+		limit:      limit,
+		sortKey:    sortKey,
 		filter:     fi,
 		height:     24,
 		width:      100,
@@ -59,7 +68,7 @@ func newTopModel(socketPath string) topModel {
 }
 
 func (m topModel) Init() tea.Cmd {
-	return tea.Batch(refreshCmd(m.socketPath, 50), tickCmd())
+	return tea.Batch(refreshCmd(m.socketPath, m.limit), tickCmd())
 }
 
 func refreshCmd(socketPath string, limit int) tea.Cmd {
@@ -90,7 +99,7 @@ func (m topModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.source = msg.view.Source
 		return m, nil
 	case tickMsg:
-		return m, tea.Batch(refreshCmd(m.socketPath, 50), tickCmd())
+		return m, tea.Batch(refreshCmd(m.socketPath, m.limit), tickCmd())
 	case tea.KeyMsg:
 		if m.confirming {
 			switch msg.String() {

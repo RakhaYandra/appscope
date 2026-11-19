@@ -10,13 +10,17 @@ import (
 	"github.com/RakhaYandra/appscope/internal/ipc"
 )
 
+// Version is stamped at build time via -ldflags "-X github.com/RakhaYandra/appscope/internal/cli.Version=v0.1.0".
+var Version = "dev"
+
 func NewRootCmd() *cobra.Command {
 	var socketPath string
 
 	root := &cobra.Command{
-		Use:   "appscope",
-		Short: "Application resource intelligence for Linux",
-		Long:  "AppScope monitors CPU, memory, and disk I/O per logical application — one engine, queried by this CLI and the Omarchy plugin.",
+		Use:     "appscope",
+		Short:   "Application resource intelligence for Linux",
+		Long:    "AppScope monitors CPU, memory, and disk I/O per logical application — one engine, queried by this CLI and the Omarchy plugin.",
+		Version: Version,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			watch, _ := cmd.Flags().GetBool("watch")
 			interval, _ := cmd.Flags().GetDuration("interval")

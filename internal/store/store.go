@@ -42,6 +42,14 @@ CREATE TABLE IF NOT EXISTS threshold_alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_sys_time ON system_metrics(timestamp);
 CREATE INDEX IF NOT EXISTS idx_app_time ON application_metrics(app_name, timestamp);
+CREATE TABLE IF NOT EXISTS alert_rules (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	app_name TEXT NOT NULL,
+	metric TEXT NOT NULL,
+	threshold REAL NOT NULL,
+	enabled INTEGER NOT NULL DEFAULT 1,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `
 
 type Store struct {
